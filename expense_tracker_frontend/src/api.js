@@ -18,6 +18,33 @@ function buildQuery(params = {}) {
   return qs ? `?${qs}` : '';
 }
 
+/**
+ * INTERNAL: Safely parse JSON only when the content-type indicates JSON.
+ * If the response is HTML/text, return null to allow graceful handling.
+ */
+async function safeJson(res) {
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.toLowerCase().includes('application/json')) {
+    // Try to read text for better diagnostics
+    const text = await res.text().catch(() => '');
+    // eslint-disable-next-line no-console
+    console.error('Expected JSON but received non-JSON response.', {
+      status: res.status,
+      url: res.url,
+      contentType: ct,
+      preview: text?.slice(0, 200),
+    });
+    return null;
+  }
+  try {
+    return await res.json();
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to parse JSON response', { url: res.url, error: e });
+    return null;
+  }
+}
+
  // PUBLIC_INTERFACE
 export async function fetchCategories() {
   /** Fetch list of categories from backend.
@@ -29,13 +56,16 @@ export async function fetchCategories() {
    *
    * Returns a normalized array of { id, name } objects to prevent rendering issues if the API structure changes.
    */
-  const res = await fetch(`${API_BASE}/api/categories`);
+  const url = `${API_BASE}/api/categories`;
+  const res = await fetch(url);
   if (!res.ok) {
-    // Graceful empty state: return [] so UI shows "No categories available" instead of crashing.
-    // Also throw to allow outer callers to log/alert if desired.
-    throw new Error(`Failed to load categories`);
+    throw new Error(`Failed to load categories (status ${res.status})`);
   }
-  const raw = await res.json();
+  const raw = await safeJson(res);
+  if (!raw) {
+    // Return empty array but throw a meaningful error so caller can log
+    throw new Error('Categories endpoint returned non-JSON (HTML or text). Check API_BASE or dev proxy/back-end status.');
+  }
 
   // Always prefer `data` as per requirement, with fallbacks.
   const source = Array.isArray(raw?.data)

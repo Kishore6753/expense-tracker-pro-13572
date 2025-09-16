@@ -9,6 +9,7 @@ import ExpenseList from './components/ExpenseList';
 import SummaryPanel from './components/SummaryPanel';
 import FilterBar from './components/FilterBar';
 import ChartsPanel from './components/ChartsPanel';
+import { runApiDiagnostics } from './utils/diagnostics';
 
 // PUBLIC_INTERFACE
 function App() {
@@ -54,6 +55,10 @@ function App() {
       const [cats, exps, sum, catSum, chart] = await Promise.all([
         fetchCategories().catch((e) => {
           console.error('Categories load failed:', e);
+          // Surface a one-time alert to guide setup if HTML was returned
+          if (String(e?.message || '').toLowerCase().includes('non-json') || String(e).includes('html')) {
+            alert('Categories API returned HTML instead of JSON. Ensure backend is running and API base/proxy is configured.\n- Set REACT_APP_API_BASE or\n- Use CRA proxy in package.json (proxy -> http://localhost:4000)\n- Start backend at that address.');
+          }
           return [];
         }),
         fetchExpenses(effective),
@@ -77,6 +82,9 @@ function App() {
 
   useEffect(() => {
     // initial load without filters
+    if (process.env.NODE_ENV === 'development') {
+      runApiDiagnostics(API_BASE).catch(() => {});
+    }
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
