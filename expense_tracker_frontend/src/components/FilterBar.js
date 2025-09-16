@@ -40,18 +40,29 @@ export default function FilterBar({ filters, setFilters, categories, onApply, on
         </div>
         <div className="col">
           <label htmlFor="categoryId">Category</label>
-          <select id="categoryId" name="categoryId" aria-label="Filter by category" value={String(filters.categoryId || '')} onChange={onChange}>
-            <option value="">{Array.isArray(categories) && categories.length > 0 ? 'All' : 'No categories'}</option>
-            {Array.isArray(categories) && categories.map((c) => {
-              const id = (c.id ?? c.value ?? c.categoryId);
-              const label = (c.name ?? c.label ?? c.categoryName ?? `#${id}`);
-              if (id === undefined || id === null) return null;
-              return (
-                <option key={String(id)} value={String(id)}>
-                  {label}
-                </option>
-              );
-            })}
+          <select
+            id="categoryId"
+            name="categoryId"
+            aria-label="Filter by category"
+            value={String(filters.categoryId || '')}
+            onChange={onChange}
+          >
+            <option value="">
+              {Array.isArray(categories) && categories.length > 0 ? 'All' : 'No categories'}
+            </option>
+            {Array.isArray(categories) &&
+              categories
+                .filter(Boolean)
+                .map((c) => {
+                  const id = c.id ?? c.value ?? c.categoryId;
+                  if (id === undefined || id === null) return null;
+                  const label = c.name ?? c.label ?? c.categoryName ?? `#${id}`;
+                  return (
+                    <option key={String(id)} value={String(id)}>
+                      {label}
+                    </option>
+                  );
+                })}
           </select>
         </div>
         <div className="col" style={{ flex: 1 }}>

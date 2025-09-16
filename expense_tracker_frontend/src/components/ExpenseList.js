@@ -66,12 +66,20 @@ export default function ExpenseList({ expenses, categoriesById, onUpdate, onDele
                     </td>
                     <td>
                       <select
+                        aria-label="Edit category"
                         value={String(draft.categoryId ?? '')}
                         onChange={(e) => setDraft(prev => ({ ...prev, categoryId: e.target.value }))}
                       >
-                        {Object.entries(categoriesById).map(([id, cat]) => (
-                          <option key={id} value={id}>{cat.name ?? cat.label ?? `#${id}`}</option>
-                        ))}
+                        <option value="" disabled>
+                          {Object.keys(categoriesById || {}).length > 0 ? 'Select category' : 'No categories'}
+                        </option>
+                        {Object.entries(categoriesById || {})
+                          .filter(([id, cat]) => id != null && cat)
+                          .map(([id, cat]) => (
+                            <option key={String(id)} value={String(id)}>
+                              {cat.name ?? cat.label ?? `#${id}`}
+                            </option>
+                          ))}
                       </select>
                     </td>
                     <td style={{ textAlign: 'right' }}>

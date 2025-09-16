@@ -42,21 +42,30 @@ export default function ExpenseForm({ categories, onSubmit }) {
         </div>
         <div className="col">
           <label htmlFor="category">Category</label>
-          <select id="category" value={String(categoryId || '')} onChange={(e) => setCategoryId(e.target.value)}>
-            <option value="" disabled={categories?.length === 0}>
+          <select
+            id="category"
+            name="categoryId"
+            aria-label="Select category"
+            value={String(categoryId || '')}
+            onChange={(e) => setCategoryId(e.target.value)}
+          >
+            <option value="" disabled>
               {Array.isArray(categories) && categories.length > 0 ? 'Select category' : 'No categories available'}
             </option>
-            {Array.isArray(categories) && categories.map((c) => {
-              // c expected normalized to {id, name}; still handle legacy shapes safely
-              const id = (c.id ?? c.value ?? c.categoryId);
-              const label = (c.name ?? c.label ?? c.categoryName ?? `#${id}`);
-              if (id === undefined || id === null) return null;
-              return (
-                <option key={String(id)} value={String(id)}>
-                  {label}
-                </option>
-              );
-            })}
+            {Array.isArray(categories) &&
+              categories
+                .filter(Boolean)
+                .map((c) => {
+                  // c expected normalized to {id, name}; still handle legacy shapes safely
+                  const id = c.id ?? c.value ?? c.categoryId;
+                  if (id === undefined || id === null) return null;
+                  const label = c.name ?? c.label ?? c.categoryName ?? `#${id}`;
+                  return (
+                    <option key={String(id)} value={String(id)}>
+                      {label}
+                    </option>
+                  );
+                })}
           </select>
         </div>
         <div className="col" style={{ flex: 1 }}>
