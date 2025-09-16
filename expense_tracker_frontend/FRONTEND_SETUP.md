@@ -6,11 +6,14 @@
 2) Configure backend API base URL
    Option A (recommended for dev): Use CRA proxy (configured in package.json) and leave REACT_APP_API_BASE empty.
    - Start backend at http://localhost:4000
+   - Ensure package.json has "proxy": "http://localhost:4000"
+   - Restart the frontend dev server after any proxy change
    - Start frontend; /api/* calls will be proxied automatically to http://localhost:4000
 
    Option B: Use absolute base URL
    - Copy .env.example to .env and set:
      REACT_APP_API_BASE=http://localhost:4000
+   - Restart the frontend dev server after changing .env
 
 3) Optional: Enable Supabase Authentication
    Add to .env:
@@ -34,6 +37,7 @@ Troubleshooting:
   - Ensure the backend is running at http://localhost:4000.
   - If using proxy, confirm "proxy": "http://localhost:4000" exists in package.json and restart dev server after changes.
   - If using REACT_APP_API_BASE, verify it points to the backend and is set before starting the dev server.
+  - In development, App shows a Diagnostics card indicating whether / and /api/categories return JSON.
 
 Notes:
 - Charts use Recharts, filters use dayjs for date handling.
