@@ -41,7 +41,7 @@ export default function FilterBar({ filters, setFilters, categories, onApply, on
         <div className="col">
           <label htmlFor="categoryId">Category</label>
           <select id="categoryId" name="categoryId" value={filters.categoryId || ''} onChange={onChange}>
-            <option value="">{categories?.length === 0 ? 'No categories' : 'All'}</option>
+            <option value="">{Array.isArray(categories) && categories.length > 0 ? 'All' : 'No categories'}</option>
             {Array.isArray(categories) && categories.map((c) => {
               const id = (c.id ?? c.value ?? c.categoryId);
               const label = (c.name ?? c.label ?? c.categoryName ?? `#${id}`);

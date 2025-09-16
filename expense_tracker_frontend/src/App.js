@@ -52,12 +52,16 @@ function App() {
     try {
       const effective = { ...filters, ...opts };
       const [cats, exps, sum, catSum, chart] = await Promise.all([
-        fetchCategories(),
+        fetchCategories().catch((e) => {
+          console.error('Categories load failed:', e);
+          return [];
+        }),
         fetchExpenses(effective),
         fetchSummary(effective),
         fetchCategorySummary(effective),
         fetchChartData(effective),
       ]);
+      // cats is expected to be a normalized array [{id, name}, ...]
       setCategories(Array.isArray(cats) ? cats : []);
       setExpenses(exps?.items ?? exps ?? []); // handle either {items:[]} or []
       setOverall(sum);

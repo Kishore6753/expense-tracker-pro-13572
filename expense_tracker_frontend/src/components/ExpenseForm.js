@@ -44,7 +44,7 @@ export default function ExpenseForm({ categories, onSubmit }) {
           <label htmlFor="category">Category</label>
           <select id="category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
             <option value="" disabled={categories?.length === 0}>
-              {categories?.length === 0 ? 'No categories available' : 'Select category'}
+              {Array.isArray(categories) && categories.length > 0 ? 'Select category' : 'No categories available'}
             </option>
             {Array.isArray(categories) && categories.map((c) => {
               // c expected normalized to {id, name}; still handle legacy shapes safely

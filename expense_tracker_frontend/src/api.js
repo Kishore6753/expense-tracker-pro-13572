@@ -18,23 +18,34 @@ function buildQuery(params = {}) {
   return qs ? `?${qs}` : '';
 }
 
-// PUBLIC_INTERFACE
+ // PUBLIC_INTERFACE
 export async function fetchCategories() {
   /** Fetch list of categories from backend.
-   * Normalizes responses that may be either:
-   * - an array: [{ id, name }, ...]
-   * - an object wrapper: { items: [...] } or { data: [...] }
-   * Returns a normalized array of { id, name } objects to prevent rendering issues.
+   * IMPORTANT: The backend returns an object with a `data` property that holds the array of categories.
+   * We intentionally prioritize `raw.data` and include robust fallbacks for legacy/alternative shapes:
+   * - { data: [...] }  <-- primary/expected
+   * - { items: [...] } <-- fallback
+   * - [ ... ]          <-- fallback if API returns array directly
+   *
+   * Returns a normalized array of { id, name } objects to prevent rendering issues if the API structure changes.
    */
   const res = await fetch(`${API_BASE}/api/categories`);
-  if (!res.ok) throw new Error(`Failed to load categories`);
+  if (!res.ok) {
+    // Graceful empty state: return [] so UI shows "No categories available" instead of crashing.
+    // Also throw to allow outer callers to log/alert if desired.
+    throw new Error(`Failed to load categories`);
+  }
   const raw = await res.json();
-  const data = Array.isArray(raw)
-    ? raw
-    : (Array.isArray(raw?.items) ? raw.items : (Array.isArray(raw?.data) ? raw.data : []));
+
+  // Always prefer `data` as per requirement, with fallbacks.
+  const source = Array.isArray(raw?.data)
+    ? raw.data
+    : Array.isArray(raw?.items)
+      ? raw.items
+      : (Array.isArray(raw) ? raw : []);
 
   // Normalize each category to { id, name }
-  const normalized = data
+  const normalized = source
     .filter(Boolean)
     .map((c) => {
       // Support possible shapes: {id, name}, {value, label}, {categoryId, categoryName}, {id, label}
