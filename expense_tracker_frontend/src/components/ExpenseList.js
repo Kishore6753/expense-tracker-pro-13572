@@ -66,7 +66,7 @@ export default function ExpenseList({ expenses, categoriesById, onUpdate, onDele
                     </td>
                     <td>
                       <select
-                        value={draft.categoryId}
+                        value={String(draft.categoryId ?? '')}
                         onChange={(e) => setDraft(prev => ({ ...prev, categoryId: e.target.value }))}
                       >
                         {Object.entries(categoriesById).map(([id, cat]) => (

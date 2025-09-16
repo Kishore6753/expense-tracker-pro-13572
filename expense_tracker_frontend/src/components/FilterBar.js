@@ -40,7 +40,7 @@ export default function FilterBar({ filters, setFilters, categories, onApply, on
         </div>
         <div className="col">
           <label htmlFor="categoryId">Category</label>
-          <select id="categoryId" name="categoryId" value={filters.categoryId || ''} onChange={onChange}>
+          <select id="categoryId" name="categoryId" aria-label="Filter by category" value={String(filters.categoryId || '')} onChange={onChange}>
             <option value="">{Array.isArray(categories) && categories.length > 0 ? 'All' : 'No categories'}</option>
             {Array.isArray(categories) && categories.map((c) => {
               const id = (c.id ?? c.value ?? c.categoryId);

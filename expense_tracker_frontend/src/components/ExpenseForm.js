@@ -42,7 +42,7 @@ export default function ExpenseForm({ categories, onSubmit }) {
         </div>
         <div className="col">
           <label htmlFor="category">Category</label>
-          <select id="category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+          <select id="category" value={String(categoryId || '')} onChange={(e) => setCategoryId(e.target.value)}>
             <option value="" disabled={categories?.length === 0}>
               {Array.isArray(categories) && categories.length > 0 ? 'Select category' : 'No categories available'}
             </option>

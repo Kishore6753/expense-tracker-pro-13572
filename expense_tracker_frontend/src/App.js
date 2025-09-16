@@ -21,6 +21,8 @@ function App() {
   const [catSummary, setCatSummary] = useState([]);
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [categoryError, setCategoryError] = useState('');
+  const [diagnostics, setDiagnostics] = useState(null);
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -52,15 +54,23 @@ function App() {
     setLoading(true);
     try {
       const effective = { ...filters, ...opts };
+      let catErr = '';
       const [cats, exps, sum, catSum, chart] = await Promise.all([
-        fetchCategories().catch((e) => {
-          console.error('Categories load failed:', e);
-          // Surface a one-time alert to guide setup if HTML was returned
-          if (String(e?.message || '').toLowerCase().includes('non-json') || String(e).includes('html')) {
-            alert('Categories API returned HTML instead of JSON. Ensure backend is running and API base/proxy is configured.\n- Set REACT_APP_API_BASE or\n- Use CRA proxy in package.json (proxy -> http://localhost:4000)\n- Start backend at that address.');
+        (async () => {
+          try {
+            const c = await fetchCategories();
+            return c;
+          } catch (e) {
+            console.error('Categories load failed:', e);
+            const msg = String(e?.message || e || 'Failed to load categories');
+            catErr = msg;
+            // specific guidance if non-json/HTML
+            if (msg.toLowerCase().includes('non-json')) {
+              catErr += ' — The API returned HTML instead of JSON. Ensure the backend is running and API base/proxy is configured.';
+            }
+            return [];
           }
-          return [];
-        }),
+        })(),
         fetchExpenses(effective),
         fetchSummary(effective),
         fetchCategorySummary(effective),
@@ -72,6 +82,7 @@ function App() {
       setOverall(sum);
       setCatSummary(catSum);
       setChartData(chart);
+      setCategoryError(catErr);
     } catch (e) {
       console.error(e);
       alert('Failed to load data from API.');
@@ -83,7 +94,13 @@ function App() {
   useEffect(() => {
     // initial load without filters
     if (process.env.NODE_ENV === 'development') {
-      runApiDiagnostics(API_BASE).catch(() => {});
+      runApiDiagnostics(API_BASE)
+        .then((res) => setDiagnostics(res))
+        .catch((err) => {
+          // eslint-disable-next-line no-console
+          console.warn('Diagnostics failed', err);
+          setDiagnostics({ error: String(err) });
+        });
     }
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -180,6 +197,25 @@ function App() {
       </div>
 
       <div className="container">
+        {categoryError && (
+          <div className="card" style={{ marginBottom: 12, borderColor: 'var(--danger-bg)' }}>
+            <div style={{ color: 'var(--danger-bg)', fontWeight: 600, marginBottom: 6 }}>Category Load Error</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{categoryError}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
+              Tips: If using CRA proxy ensure package.json has "proxy": "http://localhost:4000" and backend runs there; or set REACT_APP_API_BASE to the full backend URL and restart the dev server.
+            </div>
+          </div>
+        )}
+        {process.env.NODE_ENV === 'development' && diagnostics && (
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div className="card-header" style={{ fontWeight: 600 }}>Diagnostics</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              API Base: {API_BASE || '(proxy/relative)'}<br/>
+              Health: {diagnostics.health ? JSON.stringify(diagnostics.health) : 'n/a'}<br/>
+              Categories: {diagnostics.categories ? JSON.stringify(diagnostics.categories) : 'n/a'}
+            </div>
+          </div>
+        )}
         <ExpenseForm categories={categories} onSubmit={handleCreateExpense} />
         <FilterBar
           filters={filters}

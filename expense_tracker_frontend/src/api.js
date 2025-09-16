@@ -57,14 +57,34 @@ export async function fetchCategories() {
    * Returns a normalized array of { id, name } objects to prevent rendering issues if the API structure changes.
    */
   const url = `${API_BASE}/api/categories`;
-  const res = await fetch(url);
+  let res;
+  try {
+    res = await fetch(url, { headers: { Accept: 'application/json' } });
+  } catch (e) {
+    const msg = `Network error while loading categories: ${e?.message || e}`;
+    // eslint-disable-next-line no-console
+    console.error(msg);
+    const err = new Error(msg);
+    err.code = 'NETWORK';
+    throw err;
+  }
   if (!res.ok) {
-    throw new Error(`Failed to load categories (status ${res.status})`);
+    // Try to capture body preview for diagnostics
+    let preview = '';
+    try { preview = (await res.text()).slice(0, 200); } catch (_) {}
+    const msg = `Failed to load categories: status ${res.status}. Preview: ${preview}`;
+    // eslint-disable-next-line no-console
+    console.error(msg);
+    const err = new Error(msg);
+    err.code = 'HTTP';
+    err.status = res.status;
+    throw err;
   }
   const raw = await safeJson(res);
   if (!raw) {
-    // Return empty array but throw a meaningful error so caller can log
-    throw new Error('Categories endpoint returned non-JSON (HTML or text). Check API_BASE or dev proxy/back-end status.');
+    const err = new Error('Categories endpoint returned non-JSON (HTML or text). Check API_BASE or dev proxy/back-end status.');
+    err.code = 'NON_JSON';
+    throw err;
   }
 
   // Always prefer `data` as per requirement, with fallbacks.
