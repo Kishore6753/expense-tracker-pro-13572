@@ -20,10 +20,19 @@ function buildQuery(params = {}) {
 
 // PUBLIC_INTERFACE
 export async function fetchCategories() {
-  /** Fetch list of categories from backend. */
+  /** Fetch list of categories from backend.
+   * Normalizes responses that may be either:
+   * - an array: [{ id, name }, ...]
+   * - an object wrapper: { items: [...] } or { data: [...] }
+   */
   const res = await fetch(`${API_BASE}/api/categories`);
   if (!res.ok) throw new Error(`Failed to load categories`);
-  return res.json();
+  const data = await res.json();
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.items)) return data.items;
+  if (data && Array.isArray(data.data)) return data.data;
+  // Fallback: return empty array if unexpected shape
+  return [];
 }
 
 // PUBLIC_INTERFACE

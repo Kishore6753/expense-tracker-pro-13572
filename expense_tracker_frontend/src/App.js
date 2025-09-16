@@ -56,7 +56,7 @@ function App() {
         fetchCategorySummary(effective),
         fetchChartData(effective),
       ]);
-      setCategories(cats);
+      setCategories(Array.isArray(cats) ? cats : []);
       setExpenses(exps?.items ?? exps ?? []); // handle either {items:[]} or []
       setOverall(sum);
       setCatSummary(catSum);
