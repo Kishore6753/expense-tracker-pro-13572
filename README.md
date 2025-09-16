@@ -1,1 +1,3 @@
-# expense-tracker-pro-13572
+# Project Repository
+
+This is the initial README file for the project.
