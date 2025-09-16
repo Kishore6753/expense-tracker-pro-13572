@@ -1,12 +1,15 @@
-//
-// PUBLIC_INTERFACE
-// api.js - Centralized API client for Expense Tracker frontend.
-// Uses REACT_APP_API_BASE env variable (must be provided in .env) to configure backend base URL.
-//
+/**
+ * PUBLIC_INTERFACE
+ * api.js - Centralized API client for Expense Tracker frontend.
+ * Uses REACT_APP_API_BASE env variable (if provided) or CRA proxy (relative calls).
+ * Diagnostics-first: surfaces clear errors for non-JSON and network issues.
+ */
 const API_BASE =
-  process.env.REACT_APP_API_BASE || ''; // Comment: Set REACT_APP_API_BASE in .env to "http://localhost:PORT" or gateway URL
+  process.env.REACT_APP_API_BASE || ''; // Set REACT_APP_API_BASE in .env to "http://localhost:PORT" or gateway URL
 
-// Helper to build query strings from an object, omitting null/undefined/empty values
+/**
+ * INTERNAL: Build query string from object, omitting null/undefined/empty values.
+ */
 function buildQuery(params = {}) {
   const qp = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
@@ -19,13 +22,15 @@ function buildQuery(params = {}) {
 }
 
 /**
- * INTERNAL: Safely parse JSON only when the content-type indicates JSON.
- * If the response is HTML/text, return null to allow graceful handling.
+ * INTERNAL: Attempt to parse JSON only when content-type indicates JSON.
+ * Returns { json: any|null, nonJsonPreview: string|null, contentType: string }
+ * - json is null if non-JSON or parse failed
+ * - nonJsonPreview includes first 200 chars of body for diagnostics when not JSON
  */
 async function safeJson(res) {
   const ct = res.headers.get('content-type') || '';
-  if (!ct.toLowerCase().includes('application/json')) {
-    // Try to read text for better diagnostics
+  const lower = ct.toLowerCase();
+  if (!lower.includes('application/json')) {
     const text = await res.text().catch(() => '');
     // eslint-disable-next-line no-console
     console.error('Expected JSON but received non-JSON response.', {
@@ -34,28 +39,24 @@ async function safeJson(res) {
       contentType: ct,
       preview: text?.slice(0, 200),
     });
-    return null;
+    return { json: null, nonJsonPreview: text?.slice(0, 200) || '', contentType: ct };
   }
   try {
-    return await res.json();
+    const parsed = await res.json();
+    return { json: parsed, nonJsonPreview: null, contentType: ct };
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('Failed to parse JSON response', { url: res.url, error: e });
-    return null;
+    return { json: null, nonJsonPreview: null, contentType: ct };
   }
 }
 
- // PUBLIC_INTERFACE
+/**
+ * PUBLIC_INTERFACE
+ * Fetch list of categories from backend and normalize.
+ * Normalizes output to [{ id, name }, ...].
+ */
 export async function fetchCategories() {
-  /** Fetch list of categories from backend.
-   * IMPORTANT: The backend returns an object with a `data` property that holds the array of categories.
-   * We intentionally prioritize `raw.data` and include robust fallbacks for legacy/alternative shapes:
-   * - { data: [...] }  <-- primary/expected
-   * - { items: [...] } <-- fallback
-   * - [ ... ]          <-- fallback if API returns array directly
-   *
-   * Returns a normalized array of { id, name } objects to prevent rendering issues if the API structure changes.
-   */
   const url = `${API_BASE}/api/categories`;
   let res;
   try {
@@ -63,48 +64,56 @@ export async function fetchCategories() {
   } catch (e) {
     const msg = `Network error while loading categories: ${e?.message || e}`;
     // eslint-disable-next-line no-console
-    console.error(msg);
+    console.error('[fetchCategories] Network failure', { url, error: e });
     const err = new Error(msg);
     err.code = 'NETWORK';
     throw err;
   }
+
   if (!res.ok) {
-    // Try to capture body preview for diagnostics
+    // Capture body preview for diagnostics even on non-2xx
     let preview = '';
     try { preview = (await res.text()).slice(0, 200); } catch (_) {}
     const msg = `Failed to load categories: status ${res.status}. Preview: ${preview}`;
     // eslint-disable-next-line no-console
-    console.error(msg);
+    console.error('[fetchCategories] HTTP error', { url, status: res.status, preview });
     const err = new Error(msg);
     err.code = 'HTTP';
     err.status = res.status;
     throw err;
   }
-  const raw = await safeJson(res);
+
+  const { json: raw, nonJsonPreview, contentType } = await safeJson(res);
   if (!raw) {
-    const err = new Error('Categories endpoint returned non-JSON (HTML or text). Check API_BASE or dev proxy/back-end status.');
+    const err = new Error(
+      `Categories endpoint returned non-JSON (Content-Type: ${contentType || 'unknown'}).` +
+      ` Preview: ${nonJsonPreview || '(empty)'}`
+    );
     err.code = 'NON_JSON';
     throw err;
   }
 
-  // Always prefer `data` as per requirement, with fallbacks.
+  // Prefer raw.data, fallbacks to raw.items or array root
   const source = Array.isArray(raw?.data)
     ? raw.data
     : Array.isArray(raw?.items)
       ? raw.items
       : (Array.isArray(raw) ? raw : []);
 
-  // Normalize each category to { id, name }
   const normalized = source
     .filter(Boolean)
     .map((c) => {
-      // Support possible shapes: {id, name}, {value, label}, {categoryId, categoryName}, {id, label}
       const id = c.id ?? c.categoryId ?? c.value;
       const name = c.name ?? c.categoryName ?? c.label ?? (id != null ? `#${id}` : 'Unknown');
       return { id, name };
     })
-    // remove items with missing id
     .filter((c) => c.id !== undefined && c.id !== null);
+
+  // Dev aid: log if the array is unexpectedly empty
+  if (normalized.length === 0) {
+    // eslint-disable-next-line no-console
+    console.warn('[fetchCategories] Parsed categories array is empty. Check backend seed or response format.', { raw });
+  }
 
   return normalized;
 }
@@ -113,42 +122,60 @@ export async function fetchCategories() {
 export async function fetchExpenses(filters = {}) {
   /** Fetch expenses with optional filters: startDate, endDate, categoryId, search, limit, offset, sortBy, sortDir */
   const qs = buildQuery(filters);
-  const res = await fetch(`${API_BASE}/api/expenses${qs}`);
-  if (!res.ok) throw new Error(`Failed to load expenses`);
+  const url = `${API_BASE}/api/expenses${qs}`;
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!res.ok) {
+    let preview = '';
+    try { preview = (await res.text()).slice(0, 200); } catch (_) {}
+    throw new Error(`Failed to load expenses: ${res.status}. ${preview}`);
+  }
   return res.json();
 }
 
 // PUBLIC_INTERFACE
 export async function createExpense(payload) {
   /** Create a new expense. Payload: {amount, categoryId, notes?, createdAt?} */
-  const res = await fetch(`${API_BASE}/api/expenses`, {
+  const url = `${API_BASE}/api/expenses`;
+  const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error(`Failed to create expense`);
+  if (!res.ok) {
+    let preview = '';
+    try { preview = (await res.text()).slice(0, 200); } catch (_) {}
+    throw new Error(`Failed to create expense: ${res.status}. ${preview}`);
+  }
   return res.json();
 }
 
 // PUBLIC_INTERFACE
 export async function updateExpense(id, payload) {
   /** Update an expense by id. Payload may contain partial fields. */
-  const res = await fetch(`${API_BASE}/api/expenses/${id}`, {
+  const url = `${API_BASE}/api/expenses/${id}`;
+  const res = await fetch(url, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error(`Failed to update expense`);
+  if (!res.ok) {
+    let preview = '';
+    try { preview = (await res.text()).slice(0, 200); } catch (_) {}
+    throw new Error(`Failed to update expense: ${res.status}. ${preview}`);
+  }
   return res.json();
 }
 
 // PUBLIC_INTERFACE
 export async function deleteExpense(id) {
   /** Delete an expense by id. */
-  const res = await fetch(`${API_BASE}/api/expenses/${id}`, {
-    method: 'DELETE',
-  });
-  if (!res.ok) throw new Error(`Failed to delete expense`);
+  const url = `${API_BASE}/api/expenses/${id}`;
+  const res = await fetch(url, { method: 'DELETE', headers: { Accept: 'application/json' } });
+  if (!res.ok) {
+    let preview = '';
+    try { preview = (await res.text()).slice(0, 200); } catch (_) {}
+    throw new Error(`Failed to delete expense: ${res.status}. ${preview}`);
+  }
   return res.json();
 }
 
@@ -156,8 +183,13 @@ export async function deleteExpense(id) {
 export async function fetchSummary(filters = {}) {
   /** Fetch overall summary: { totalAmount, count } */
   const qs = buildQuery(filters);
-  const res = await fetch(`${API_BASE}/api/summary${qs}`);
-  if (!res.ok) throw new Error(`Failed to load summary`);
+  const url = `${API_BASE}/api/summary${qs}`;
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!res.ok) {
+    let preview = '';
+    try { preview = (await res.text()).slice(0, 200); } catch (_) {}
+    throw new Error(`Failed to load summary: ${res.status}. ${preview}`);
+  }
   return res.json();
 }
 
@@ -165,26 +197,41 @@ export async function fetchSummary(filters = {}) {
 export async function fetchCategorySummary(filters = {}) {
   /** Fetch category summary: list of { categoryId, categoryName, total } */
   const qs = buildQuery(filters);
-  const res = await fetch(`${API_BASE}/api/summary/categories${qs}`);
-  if (!res.ok) throw new Error(`Failed to load category summary`);
+  const url = `${API_BASE}/api/summary/categories${qs}`;
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!res.ok) {
+    let preview = '';
+    try { preview = (await res.text()).slice(0, 200); } catch (_) {}
+    throw new Error(`Failed to load category summary: ${res.status}. ${preview}`);
+  }
   return res.json();
 }
 
 // PUBLIC_INTERFACE
 export async function exportCsv(filters = {}) {
-  /** Request CSV export for given filters; returns Blob */
+  /** Request CSV export for given filters and return CSV string */
   const qs = buildQuery(filters);
-  const res = await fetch(`${API_BASE}/api/export/csv${qs}`);
-  if (!res.ok) throw new Error(`Failed to export CSV`);
-  return res.text(); // backend returns CSV string per openapi
+  const url = `${API_BASE}/api/export/csv${qs}`;
+  const res = await fetch(url, { headers: { Accept: 'text/csv,application/octet-stream,*/*' } });
+  if (!res.ok) {
+    let preview = '';
+    try { preview = (await res.text()).slice(0, 200); } catch (_) {}
+    throw new Error(`Failed to export CSV: ${res.status}. ${preview}`);
+  }
+  return res.text();
 }
 
 // PUBLIC_INTERFACE
 export async function fetchChartData(filters = {}) {
   /** Fetch chart-ready data; expect arrays for date series and category series as backend provides. */
   const qs = buildQuery(filters);
-  const res = await fetch(`${API_BASE}/api/chart-data${qs}`);
-  if (!res.ok) throw new Error(`Failed to load chart data`);
+  const url = `${API_BASE}/api/chart-data${qs}`;
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!res.ok) {
+    let preview = '';
+    try { preview = (await res.text()).slice(0, 200); } catch (_) {}
+    throw new Error(`Failed to load chart data: ${res.status}. ${preview}`);
+  }
   return res.json();
 }
 

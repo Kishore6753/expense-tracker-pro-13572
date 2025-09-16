@@ -32,12 +32,24 @@
    npm start
 
 Troubleshooting:
-- If you see "Unexpected token '<', '<!DOCTYPE' is not valid JSON":
-  - The categories endpoint likely returned HTML (e.g., index.html) instead of JSON.
-  - Ensure the backend is running at http://localhost:4000.
-  - If using proxy, confirm "proxy": "http://localhost:4000" exists in package.json and restart dev server after changes.
+- If you see "Unexpected token '<', '<!DOCTYPE' is not valid JSON" or the "Category Load Error" banner:
+  - The categories endpoint likely returned HTML or non-JSON (e.g., index.html) or the backend is unreachable.
+  - Confirm the backend is running at http://localhost:4000 (default).
+  - If using CRA proxy, ensure package.json includes "proxy": "http://localhost:4000" and restart the dev server after changes.
   - If using REACT_APP_API_BASE, verify it points to the backend and is set before starting the dev server.
-  - In development, App shows a Diagnostics card indicating whether / and /api/categories return JSON.
+  - The app checks the Content-Type header and will log detailed diagnostics to the console if non-JSON is returned (including a short preview of the body).
+  - In development, App shows a Diagnostics card with:
+    - GET / health status, content-type, and a sample of the body (JSON when possible)
+    - GET /api/categories status, content-type, and a sample of the body
+  - Open the browser console to see:
+    - [fetchCategories] Network failure (if fetch fails entirely)
+    - [fetchCategories] HTTP error with status and response preview
+    - Expected JSON but received non-JSON response (includes content-type and body preview)
+  - Common causes:
+    - Backend not running or wrong port
+    - Proxy misconfigured (or dev server not restarted)
+    - API_BASE pointing to a frontend server that returns HTML instead of API JSON
+    - CORS or gateway misroutes returning HTML error pages
 
 Notes:
 - Charts use Recharts, filters use dayjs for date handling.

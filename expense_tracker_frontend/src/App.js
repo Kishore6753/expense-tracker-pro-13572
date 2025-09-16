@@ -61,12 +61,16 @@ function App() {
             const c = await fetchCategories();
             return c;
           } catch (e) {
-            console.error('Categories load failed:', e);
-            const msg = String(e?.message || e || 'Failed to load categories');
-            catErr = msg;
-            // specific guidance if non-json/HTML
-            if (msg.toLowerCase().includes('non-json')) {
-              catErr += ' — The API returned HTML instead of JSON. Ensure the backend is running and API base/proxy is configured.';
+            const message = String(e?.message || e || 'Failed to load categories');
+            // eslint-disable-next-line no-console
+            console.error('Categories load failed:', {
+              error: e,
+              message,
+              apiBase: API_BASE || '(proxy/relative)',
+            });
+            catErr = message;
+            if (message.toLowerCase().includes('non-json')) {
+              catErr += ' — API returned HTML instead of JSON. Ensure backend is running and API base/proxy is configured.';
             }
             return [];
           }
@@ -76,15 +80,15 @@ function App() {
         fetchCategorySummary(effective),
         fetchChartData(effective),
       ]);
-      // cats is expected to be a normalized array [{id, name}, ...]
       setCategories(Array.isArray(cats) ? cats : []);
-      setExpenses(exps?.items ?? exps ?? []); // handle either {items:[]} or []
+      setExpenses(exps?.items ?? exps ?? []);
       setOverall(sum);
       setCatSummary(catSum);
       setChartData(chart);
       setCategoryError(catErr);
     } catch (e) {
-      console.error(e);
+      // eslint-disable-next-line no-console
+      console.error('[loadAll] Failed to load data', e);
       alert('Failed to load data from API.');
     } finally {
       setLoading(false);
@@ -135,7 +139,8 @@ function App() {
       await createExpense(payload);
       await loadAll();
     } catch (e) {
-      console.error(e);
+      // eslint-disable-next-line no-console
+      console.error('[handleCreateExpense] Failed', e);
       alert('Failed to create expense.');
     }
   };
@@ -145,7 +150,8 @@ function App() {
       await updateExpense(id, payload);
       await loadAll();
     } catch (e) {
-      console.error(e);
+      // eslint-disable-next-line no-console
+      console.error('[handleUpdateExpense] Failed', e);
       alert('Failed to update expense.');
     }
   };
@@ -157,7 +163,8 @@ function App() {
       setExpenses(prev => prev.filter(e => e.id !== id)); // optimistic update
       await loadAll();
     } catch (e) {
-      console.error(e);
+      // eslint-disable-next-line no-console
+      console.error('[handleDeleteExpense] Failed', e);
       alert('Failed to delete expense.');
     }
   };
@@ -174,7 +181,8 @@ function App() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error(e);
+      // eslint-disable-next-line no-console
+      console.error('[handleExportCsv] Failed', e);
       alert('Failed to export CSV.');
     }
   };
@@ -202,7 +210,8 @@ function App() {
             <div style={{ color: 'var(--danger-bg)', fontWeight: 600, marginBottom: 6 }}>Category Load Error</div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{categoryError}</div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
-              Tips: If using CRA proxy ensure package.json has "proxy": "http://localhost:4000" and backend runs there; or set REACT_APP_API_BASE to the full backend URL and restart the dev server.
+              Tips: Ensure backend is running and reachable. If using CRA proxy, confirm package.json has "proxy": "http://localhost:4000"
+              and restart the dev server after changes. Or set REACT_APP_API_BASE to the full backend URL and restart the dev server.
             </div>
           </div>
         )}
