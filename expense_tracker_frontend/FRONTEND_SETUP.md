@@ -31,27 +31,57 @@
 4) Run the app
    npm start
 
-Troubleshooting:
-- If you see "Unexpected token '<', '<!DOCTYPE' is not valid JSON" or the "Category Load Error" banner:
-  - The categories endpoint likely returned HTML or non-JSON (e.g., index.html) or the backend is unreachable.
-  - Confirm the backend is running at http://localhost:4000 (default).
-  - If using CRA proxy, ensure package.json includes "proxy": "http://localhost:4000" and restart the dev server after changes.
-  - If using REACT_APP_API_BASE, verify it points to the backend and is set before starting the dev server.
-  - The app checks the Content-Type header and will log detailed diagnostics to the console if non-JSON is returned (including a short preview of the body).
-  - In development, App shows a Diagnostics card with:
-    - GET / health status, content-type, and a sample of the body (JSON when possible)
-    - GET /api/categories status, content-type, and a sample of the body
-  - Open the browser console to see:
-    - [fetchCategories] Network failure (if fetch fails entirely)
-    - [fetchCategories] HTTP error with status and response preview
-    - Expected JSON but received non-JSON response (includes content-type and body preview)
-  - Common causes:
-    - Backend not running or wrong port
-    - Proxy misconfigured (or dev server not restarted)
-    - API_BASE pointing to a frontend server that returns HTML instead of API JSON
-    - CORS or gateway misroutes returning HTML error pages
+## Troubleshooting
+
+### A) "Invalid Host Header" in remote/cloud/container dev
+This can occur when the CRA dev server blocks unknown hosts (e.g., preview URLs, tunnels, or container hostnames).
+
+Quick fix (development only):
+- Copy `.env.example` to `.env`
+- Ensure these entries exist (dev-only; never for production):
+  HOST=0.0.0.0
+  DANGEROUSLY_DISABLE_HOST_CHECK=true
+- Restart the dev server: npm start
+
+Notes:
+- In this repo, package.json already sets these via cross-env in the start script:
+  "start": "cross-env HOST=0.0.0.0 DANGEROUSLY_DISABLE_HOST_CHECK=true react-scripts start"
+- Use the .env approach if you override scripts or run the dev server differently (e.g., docker-compose, custom commands).
+
+Why this happens:
+- CRA performs host header checks to protect against DNS rebinding. Remote/cloud URLs may not match localhost, triggering the error.
+
+Warnings:
+- Do not use DANGEROUSLY_DISABLE_HOST_CHECK=true in production or public deployments.
+
+### B) Category/API fetch failures and "Unexpected token '<'" errors
+- The categories endpoint likely returned HTML (e.g., index.html) or the backend is unreachable.
+- Confirm the backend is running at http://localhost:4000 (default).
+- If using CRA proxy, ensure package.json includes "proxy": "http://localhost:4000" and restart the dev server after changes.
+- If using REACT_APP_API_BASE, verify it points to the backend and is set before starting the dev server.
+
+Diagnostics built into the app:
+- The app checks the Content-Type header and logs a preview of non-JSON responses.
+- In development, a Diagnostics card appears showing:
+  - GET / health status, content-type, and a sample of the body
+  - GET /api/categories status, content-type, and a sample of the body
+
+Browser console/network:
+- Look for:
+  - [fetchCategories] Network failure
+  - [fetchCategories] HTTP error with status and response preview
+  - "Expected JSON but received non-JSON response" with content-type and body preview
+- Use the Network tab to inspect the /api/* calls, response status, content-type, and response body preview.
+
+Common causes:
+- Backend not running or wrong port
+- Proxy misconfigured (or dev server not restarted)
+- API_BASE pointing to a frontend server that returns HTML instead of JSON
+- CORS or gateway returning HTML error pages
 
 Notes:
 - Charts use Recharts, filters use dayjs for date handling.
 - CSV export hits the backend /api/export/csv endpoint and triggers a file download.
 - Supabase is optional and primarily used for auth in this app as configured.
+
+For more details, see TROUBLESHOOTING.md.
