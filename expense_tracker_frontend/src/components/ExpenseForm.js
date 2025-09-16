@@ -43,10 +43,20 @@ export default function ExpenseForm({ categories, onSubmit }) {
         <div className="col">
           <label htmlFor="category">Category</label>
           <select id="category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-            <option value="">Select category</option>
-            {categories.map(c => (
-              <option key={c.id ?? c.name} value={c.id ?? c.value}>{c.name ?? c.label}</option>
-            ))}
+            <option value="" disabled={categories?.length === 0}>
+              {categories?.length === 0 ? 'No categories available' : 'Select category'}
+            </option>
+            {Array.isArray(categories) && categories.map((c) => {
+              // c expected normalized to {id, name}; still handle legacy shapes safely
+              const id = (c.id ?? c.value ?? c.categoryId);
+              const label = (c.name ?? c.label ?? c.categoryName ?? `#${id}`);
+              if (id === undefined || id === null) return null;
+              return (
+                <option key={String(id)} value={String(id)}>
+                  {label}
+                </option>
+              );
+            })}
           </select>
         </div>
         <div className="col" style={{ flex: 1 }}>

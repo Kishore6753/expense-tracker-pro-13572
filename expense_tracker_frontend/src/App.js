@@ -38,9 +38,11 @@ function App() {
 
   const categoriesById = useMemo(() => {
     const map = {};
-    categories.forEach(c => {
-      const key = (c.id ?? c.value);
-      if (key !== undefined) map[key] = c;
+    (Array.isArray(categories) ? categories : []).forEach((c) => {
+      const key = c?.id ?? c?.value;
+      if (key !== undefined && key !== null) {
+        map[String(key)] = c;
+      }
     });
     return map;
   }, [categories]);

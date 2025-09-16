@@ -24,15 +24,28 @@ export async function fetchCategories() {
    * Normalizes responses that may be either:
    * - an array: [{ id, name }, ...]
    * - an object wrapper: { items: [...] } or { data: [...] }
+   * Returns a normalized array of { id, name } objects to prevent rendering issues.
    */
   const res = await fetch(`${API_BASE}/api/categories`);
   if (!res.ok) throw new Error(`Failed to load categories`);
-  const data = await res.json();
-  if (Array.isArray(data)) return data;
-  if (data && Array.isArray(data.items)) return data.items;
-  if (data && Array.isArray(data.data)) return data.data;
-  // Fallback: return empty array if unexpected shape
-  return [];
+  const raw = await res.json();
+  const data = Array.isArray(raw)
+    ? raw
+    : (Array.isArray(raw?.items) ? raw.items : (Array.isArray(raw?.data) ? raw.data : []));
+
+  // Normalize each category to { id, name }
+  const normalized = data
+    .filter(Boolean)
+    .map((c) => {
+      // Support possible shapes: {id, name}, {value, label}, {categoryId, categoryName}, {id, label}
+      const id = c.id ?? c.categoryId ?? c.value;
+      const name = c.name ?? c.categoryName ?? c.label ?? (id != null ? `#${id}` : 'Unknown');
+      return { id, name };
+    })
+    // remove items with missing id
+    .filter((c) => c.id !== undefined && c.id !== null);
+
+  return normalized;
 }
 
 // PUBLIC_INTERFACE
